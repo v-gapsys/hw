@@ -1,1 +1,1 @@
--r hellowworld/requirements.txt
+fastmcp==2.13.3
