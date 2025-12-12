@@ -7,6 +7,12 @@ from fastmcp import FastMCP
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
+
+def _env_flag(name: str) -> bool:
+    """Return True when an env var is set to a truthy value."""
+    return os.getenv(name, "").lower() in ("1", "true", "yes", "on")
+
+
 # 1. Create minimal MCP server
 mcp = FastMCP("hello_mcp")
 MCP_PATH = os.getenv("MCP_PATH", "/mcp")
@@ -17,11 +23,6 @@ EMBEDDINGS = None
 META = None
 INDEX_LOADED = False
 _OPENAI_CLIENT = None
-
-
-def _env_flag(name: str) -> bool:
-    """Return True when an env var is set to a truthy value."""
-    return os.getenv(name, "").lower() in ("1", "true", "yes", "on")
 
 
 def debug_log(message: str) -> None:
