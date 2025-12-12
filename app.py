@@ -1,6 +1,8 @@
 import os
 
-from hellowworld.server import MCP_PATH, bootstrap_index, debug_log, mcp
+from hellowworld.config import MCP_PATH
+from hellowworld.core import mcp
+from hellowworld.server import startup
 
 
 if __name__ == "__main__":
@@ -8,8 +10,7 @@ if __name__ == "__main__":
     host = "0.0.0.0"
 
     print(f"[server] Starting MCP on http://{host}:{port}{MCP_PATH}")
-    debug_log(f"MCP_DEBUG is enabled; listening on {MCP_PATH}")
-    bootstrap_index()
+    startup()
 
     mcp.run(
         transport="streamable-http",
