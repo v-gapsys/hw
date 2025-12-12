@@ -1,0 +1,16 @@
+[build]
+# Use Nixpacks (Railway default) from the repo root
+builder = "NIXPACKS"
+buildCommand = "pip install -r requirements.txt"
+
+[deploy]
+numReplicas = 1
+startCommand = "python app.py"
+healthcheckPath = "/"
+healthcheckTimeout = 300
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10
+
+[variables]
+NIXPACKS_PYTHON_VERSION = "3.12"
+PYTHONUNBUFFERED = "1"
