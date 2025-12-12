@@ -1,6 +1,7 @@
 import os
 
 import numpy as np
+from openai import OpenAI
 from fastmcp import FastMCP
 from starlette.requests import Request
 from starlette.responses import JSONResponse
@@ -13,6 +14,7 @@ INDEX_PATH = os.getenv("INDEX_PATH", "decisions_index.npz")
 EMBEDDINGS = None
 META = None
 INDEX_LOADED = False
+_OPENAI_CLIENT = None
 
 
 def _env_flag(name: str) -> bool:
@@ -49,6 +51,22 @@ def bootstrap_index() -> None:
     debug_log(
         f"Loaded index from {INDEX_PATH}: chunks={chunk_count}, embeddings_shape={getattr(EMBEDDINGS, 'shape', None)}"
     )
+
+
+def get_openai_client() -> OpenAI:
+    """Return a cached OpenAI client, requiring OPENAI_API_KEY to be set."""
+    global _OPENAI_CLIENT
+
+    if _OPENAI_CLIENT is not None:
+        return _OPENAI_CLIENT
+
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        raise RuntimeError("OPENAI_API_KEY is required for search tools")
+
+    _OPENAI_CLIENT = OpenAI(api_key=api_key)
+    debug_log("Initialized OpenAI client")
+    return _OPENAI_CLIENT
 
 # 2. Register one simple tool
 @mcp.tool()
