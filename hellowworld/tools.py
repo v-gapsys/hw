@@ -4,7 +4,7 @@ import numpy as np
 
 from .config import ENABLE_SEARCH_TOOLS
 from .core import mcp
-from .index_loader import EMBEDDINGS, META, ensure_index_ready
+from . import index_loader
 from .openai_client import embed_query
 
 
@@ -23,22 +23,22 @@ def _ensure_search_enabled() -> None:
 def search_decisions(query: str, top_k: int = 5) -> List[Dict[str, Any]]:
     """Semantic search over decisions. Requires ENABLE_SEARCH_TOOLS and a loaded index."""
     _ensure_search_enabled()
-    ensure_index_ready()
+    index_loader.ensure_index_ready()
 
     query_vec = embed_query(query)
-    if EMBEDDINGS.shape[1] != query_vec.shape[0]:
+    if index_loader.EMBEDDINGS.shape[1] != query_vec.shape[0]:
         raise RuntimeError(
-            f"Embedding dimension mismatch: index has {EMBEDDINGS.shape[1]}, query has {query_vec.shape[0]}"
+            f"Embedding dimension mismatch: index has {index_loader.EMBEDDINGS.shape[1]}, query has {query_vec.shape[0]}"
         )
 
-    scores = EMBEDDINGS @ query_vec  # cosine-ish assuming normalized vectors
+    scores = index_loader.EMBEDDINGS @ query_vec  # cosine-ish assuming normalized vectors
     top_k = max(1, min(top_k, len(scores)))
     top_indices = np.argpartition(scores, -top_k)[-top_k:]
     top_indices = top_indices[np.argsort(scores[top_indices])[::-1]]
 
     results: List[Dict[str, Any]] = []
     for idx in top_indices:
-        meta = META[idx]
+        meta = index_loader.META[idx]
         results.append(
             {
                 "id": meta.get("id") if isinstance(meta, dict) else getattr(meta, "id", None),
@@ -53,10 +53,10 @@ def search_decisions(query: str, top_k: int = 5) -> List[Dict[str, Any]]:
 def get_decision_chunks(decision_id: str, query: Optional[str] = None, top_k: int = 5) -> List[Dict[str, Any]]:
     """Return chunks for a decision; optionally rank by query."""
     _ensure_search_enabled()
-    ensure_index_ready()
+    index_loader.ensure_index_ready()
 
     chunks: List[Dict[str, Any]] = []
-    for meta in META:
+    for meta in index_loader.META:
         meta_id = meta.get("id") if isinstance(meta, dict) else getattr(meta, "id", None)
         if meta_id == decision_id:
             chunks.append({"id": meta_id, "chunk": meta.get("chunk") if isinstance(meta, dict) else getattr(meta, "chunk", None)})
@@ -68,12 +68,12 @@ def get_decision_chunks(decision_id: str, query: Optional[str] = None, top_k: in
         query_vec = embed_query(query)
         # Simple scoring: reuse embeddings positions where ids match; if counts mismatch, leave unsorted.
         scores: List[float] = []
-        for meta in META:
+        for meta in index_loader.META:
             meta_id = meta.get("id") if isinstance(meta, dict) else getattr(meta, "id", None)
             if meta_id == decision_id:
-                idx = np.where(META == meta)[0]
-                if idx.size > 0 and EMBEDDINGS.shape[0] > idx[0]:
-                    scores.append(float(EMBEDDINGS[idx[0]] @ query_vec))
+                idx = np.where(index_loader.META == meta)[0]
+                if idx.size > 0 and index_loader.EMBEDDINGS.shape[0] > idx[0]:
+                    scores.append(float(index_loader.EMBEDDINGS[idx[0]] @ query_vec))
         if scores and len(scores) == len(chunks):
             chunks = [chunk for _, chunk in sorted(zip(scores, chunks), key=lambda x: x[0], reverse=True)][:max(1, min(top_k, len(chunks)))]
 

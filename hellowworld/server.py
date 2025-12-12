@@ -3,7 +3,7 @@ from starlette.responses import JSONResponse
 
 from .config import MCP_PATH, debug_log
 from .core import mcp
-from .index_loader import EMBEDDINGS, INDEX_LOADED, META, bootstrap_index
+from . import index_loader
 from . import tools  # noqa: F401 - registers tools
 
 
@@ -18,13 +18,13 @@ async def health(_: Request) -> JSONResponse:
         {
             "status": "ok",
             "mcp_path": MCP_PATH,
-            "index_loaded": INDEX_LOADED,
-            "chunks": len(META) if META is not None else None,
-            "embeddings_shape": EMBEDDINGS.shape if EMBEDDINGS is not None else None,
+            "index_loaded": index_loader.INDEX_LOADED,
+            "chunks": len(index_loader.META) if index_loader.META is not None else None,
+            "embeddings_shape": index_loader.EMBEDDINGS.shape if index_loader.EMBEDDINGS is not None else None,
         }
     )
 
 
 def startup() -> None:
     debug_log(f"MCP_DEBUG is enabled; listening on {MCP_PATH}")
-    bootstrap_index()
+    index_loader.bootstrap_index()
