@@ -42,6 +42,7 @@ def search_decisions(query: str, top_k: int = 5) -> List[Dict[str, Any]]:
         results.append(
             {
                 "id": meta.get("id") if isinstance(meta, dict) else getattr(meta, "id", None),
+                "title": meta.get("title") if isinstance(meta, dict) else getattr(meta, "title", None),
                 "chunk": meta.get("chunk") if isinstance(meta, dict) else getattr(meta, "chunk", None),
                 "score": float(scores[idx]),
             }
@@ -59,7 +60,11 @@ def get_decision_chunks(decision_id: str, query: Optional[str] = None, top_k: in
     for meta in index_loader.META:
         meta_id = meta.get("id") if isinstance(meta, dict) else getattr(meta, "id", None)
         if meta_id == decision_id:
-            chunks.append({"id": meta_id, "chunk": meta.get("chunk") if isinstance(meta, dict) else getattr(meta, "chunk", None)})
+            chunks.append({
+                "id": meta_id,
+                "title": meta.get("title") if isinstance(meta, dict) else getattr(meta, "title", None),
+                "chunk": meta.get("chunk") if isinstance(meta, dict) else getattr(meta, "chunk", None)
+            })
 
     if not chunks:
         raise RuntimeError(f"No chunks found for decision_id={decision_id}")
@@ -76,5 +81,8 @@ def get_decision_chunks(decision_id: str, query: Optional[str] = None, top_k: in
                     scores.append(float(index_loader.EMBEDDINGS[idx[0]] @ query_vec))
         if scores and len(scores) == len(chunks):
             chunks = [chunk for _, chunk in sorted(zip(scores, chunks), key=lambda x: x[0], reverse=True)][:max(1, min(top_k, len(chunks)))]
+    else:
+        # When no query provided, return first top_k chunks
+        chunks = chunks[:max(1, min(top_k, len(chunks)))]
 
     return chunks
