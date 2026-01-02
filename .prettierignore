@@ -1,0 +1,51 @@
+# Python files (Prettier doesn't format Python)
+*.py
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environment
+venv/
+env/
+.venv/
+
+# Data files
+*.npz
+*.jsonl
+*.json
+
+# Build and distribution
+build/
+dist/
+*.egg-info/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Git
+.git/
+.gitignore
+
+# Documentation (if generated)
+docs/_build/
+
+# Node modules (if any)
+node_modules/
+
+# Railway
+railway.toml
+
+# README (might be manually formatted)
+# README.md
