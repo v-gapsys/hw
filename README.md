@@ -4,6 +4,8 @@ A Model Context Protocol (MCP) server that provides semantic search capabilities
 
 ## 🚀 Quick Start
 
+*Latest update: Deployment fix applied*
+
 ### Prerequisites
 - Python 3.12+
 - OpenAI API key with access to embeddings
