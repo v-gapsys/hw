@@ -164,18 +164,6 @@ def search_decisions(query: str, top_k: int = 5, paragraph_type: Optional[str] =
     top_results = sorted_results[:top_k]
 
     results: List[Dict[str, Any]] = []
-<<<<<<< HEAD
-    for idx in top_indices:
-        meta = index_loader.META[idx]
-        results.append(
-            {
-                "id": meta.get("id") if isinstance(meta, dict) else getattr(meta, "id", None),
-                "title": meta.get("title") if isinstance(meta, dict) else getattr(meta, "title", None),
-                "chunk": meta.get("chunk") if isinstance(meta, dict) else getattr(meta, "chunk", None),
-                "score": float(scores[idx]),
-            }
-        )
-=======
     for decision_id, score_data in top_results:
         meta = score_data["meta"]
         results.append({
@@ -190,7 +178,6 @@ def search_decisions(query: str, top_k: int = 5, paragraph_type: Optional[str] =
             "parties": meta.get("parties") if isinstance(meta, dict) else None,
         })
 
->>>>>>> fd77cca (Update index builder, paragraph search, and docs)
     return results
 
 
@@ -228,13 +215,6 @@ def get_decision_chunks(decision_id: str, query: Optional[str] = None, top_k: in
     for meta in index_loader.META:
         meta_id = meta.get("id") if isinstance(meta, dict) else getattr(meta, "id", None)
         if meta_id == decision_id:
-<<<<<<< HEAD
-            chunks.append({
-                "id": meta_id,
-                "title": meta.get("title") if isinstance(meta, dict) else getattr(meta, "title", None),
-                "chunk": meta.get("chunk") if isinstance(meta, dict) else getattr(meta, "chunk", None)
-            })
-=======
             chunk_data = {"id": meta_id, "chunk": meta.get("chunk") if isinstance(meta, dict) else getattr(meta, "chunk", None)}
 
             # Filter by paragraph type if specified
@@ -265,28 +245,12 @@ def get_decision_chunks(decision_id: str, query: Optional[str] = None, top_k: in
                     continue
 
             chunks.append(chunk_data)
->>>>>>> fd77cca (Update index builder, paragraph search, and docs)
 
     if not chunks:
         raise RuntimeError(f"No chunks found for decision_id={decision_id}")
 
     if query:
         query_vec = embed_query(query)
-<<<<<<< HEAD
-        # Simple scoring: reuse embeddings positions where ids match; if counts mismatch, leave unsorted.
-        scores: List[float] = []
-        for meta in index_loader.META:
-            meta_id = meta.get("id") if isinstance(meta, dict) else getattr(meta, "id", None)
-            if meta_id == decision_id:
-                idx = np.where(index_loader.META == meta)[0]
-                if idx.size > 0 and index_loader.EMBEDDINGS.shape[0] > idx[0]:
-                    scores.append(float(index_loader.EMBEDDINGS[idx[0]] @ query_vec))
-        if scores and len(scores) == len(chunks):
-            chunks = [chunk for _, chunk in sorted(zip(scores, chunks), key=lambda x: x[0], reverse=True)][:max(1, min(top_k, len(chunks)))]
-    else:
-        # When no query provided, return first top_k chunks
-        chunks = chunks[:max(1, min(top_k, len(chunks)))]
-=======
         query_lower = query.lower()
 
         # Hybrid scoring for chunks within this decision
@@ -322,7 +286,6 @@ def get_decision_chunks(decision_id: str, query: Optional[str] = None, top_k: in
         # Sort by combined score
         chunk_scores.sort(key=lambda x: x[0], reverse=True)
         chunks = [chunk for _, chunk in chunk_scores[:max(1, min(top_k, len(chunk_scores)))] ]
->>>>>>> fd77cca (Update index builder, paragraph search, and docs)
 
     return chunks
 
