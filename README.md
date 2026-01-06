@@ -1,203 +1,75 @@
-# MCP Server for Decision Search
+# MCP Decisions Server
 
-A Model Context Protocol (MCP) server that provides semantic search capabilities over decision documents using OpenAI embeddings. Built with FastMCP and deployed on Railway.
+FastMCP server with semantic search over decision documents (OpenAI embeddings) and an offline index builder.
 
-## 🚀 Quick Start
+## Project structure
+```
+app.py                     # Entry point
+hellowworld/               # MCP server package
+  config.py                # Env flags, paths
+  core.py                  # MCP instance
+  server.py                # Routes and startup
+  tools.py                 # MCP tools (search, chunk retrieval)
+  index_loader.py          # Index loading/state
+  openai_client.py         # Lazy OpenAI client
+index_builder.py           # Offline index builder
+decisions_index.npz        # Prebuilt index (embeddings + meta)
+tolerated_decisions_sectioned_motives.jsonl  # Paragraph-sectioned source data
+requirements.txt
+railway.toml
+```
 
-*Latest update: Deployment fix applied*
-
-### Prerequisites
-- Python 3.12+
-- OpenAI API key with access to embeddings
-- Git repository with decision data
-
-### Installation
-
+## Setup
 ```bash
-# Clone the repository
-git clone https://github.com/v-gapsys/hw.git
-cd hw
-
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# Install dependencies
+cd "/Users/vytautas/MCP 2026/hw"
+python3 -m venv venv
+source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### Configuration
-
-Set the following environment variables:
-
+## Run server
 ```bash
-export OPENAI_API_KEY="your-openai-api-key"
-export ENABLE_SEARCH_TOOLS=1  # Enable semantic search tools
-export MCP_DEBUG=1            # Optional: Enable debug logging
-```
-
-### Running Locally
-
-```bash
+source venv/bin/activate
 python app.py
 ```
+Env vars:
+- `MCP_PATH` (default `/mcp`)
+- `INDEX_PATH` (default `decisions_index.npz`)
+- `ENABLE_SEARCH_TOOLS=1` to expose search tools
+- `SKIP_INDEX_LOAD` / `MCP_SKIP_INDEX` to bypass loading
+- `OPENAI_API_KEY` required for search calls
+- `MCP_DEBUG=1` for debug logs
 
-The server will start on `http://localhost:8000/mcp` using SSE transport.
+Health: `/` and `/health` return status + index info.
 
-## 🏗️ Architecture & Structure
+## MCP tools
+- `search_decisions(query, top_k=5, paragraph_type=None)`: hybrid metadata + semantic search; optional paragraph filter (`reasoning`, `facts`, `law`, `operative`, `header`).
+- `search_reasoning_paragraphs`, `search_facts_paragraphs`, `search_law_paragraphs`: shortcuts for filtered search.
+- `get_decision_chunks(decision_id, query=None, top_k=5, paragraph_type=None)`: return chunks for a decision, optional rerank/filter.
+- `hello(name)`: basic connectivity check.
 
-### Core Components
-
-```
-├── app.py                      # Main entry point
-├── hellowworld/               # MCP server package
-│   ├── __init__.py
-│   ├── config.py              # Environment configuration
-│   ├── core.py                # FastMCP instance setup
-│   ├── server.py              # Server initialization & routes
-│   ├── tools.py               # MCP tools implementation
-│   ├── index_loader.py        # Search index loading
-│   └── openai_client.py       # OpenAI API client
-├── index_builder.py           # Offline index builder
-├── requirements.txt           # Python dependencies
-├── railway.toml              # Railway deployment config
-├── start.sh                  # Railway startup script
-└── decisions_index.npz       # Pre-built search index
-```
-
-### Data Flow
-
-1. **Index Building** (`index_builder.py`):
-   - Reads `tolerated_decisions.jsonl`
-   - Chunks text content (800 chars with 100 overlap)
-   - Generates embeddings via OpenAI
-   - Saves to `decisions_index.npz`
-
-2. **Server Startup** (`app.py`):
-   - Loads configuration from environment
-   - Initializes MCP server with FastMCP
-   - Registers tools and routes
-   - Starts HTTP server with SSE transport
-
-3. **Request Handling**:
-   - Health checks: `GET /health`
-   - MCP communication: `GET /mcp` (SSE)
-   - Tool execution via MCP protocol
-
-## 🛠️ MCP Tools
-
-### Available Tools
-
-#### `hello`
-A simple greeting tool for testing connectivity.
-```python
-@mcp.tool()
-def hello(name: str) -> str:
-    """Return a friendly greeting."""
-    return f"Hello, {name}! This MCP server is alive 🎉"
-```
-
-#### `search_decisions`
-Semantic search over decision documents using vector similarity.
-```python
-@mcp.tool()
-def search_decisions(query: str, top_k: int = 5) -> List[Dict[str, Any]]:
-    """Semantic search over decisions. Requires ENABLE_SEARCH_TOOLS and a loaded index."""
-```
-
-#### `get_decision_chunks`
-Retrieve specific decision chunks with optional query-based ranking.
-```python
-@mcp.tool()
-def get_decision_chunks(decision_id: str, query: Optional[str] = None, top_k: int = 5) -> List[Dict[str, Any]]:
-    """Return chunks for a decision; optionally rank by query."""
-```
-
-## 🔧 Configuration Options
-
-| Environment Variable | Default | Description |
-|---------------------|---------|-------------|
-| `MCP_PATH` | `/mcp` | MCP endpoint path |
-| `INDEX_PATH` | `decisions_index.npz` | Search index file location |
-| `ENABLE_SEARCH_TOOLS` | `false` | Enable/disable search functionality |
-| `MCP_DEBUG` | `false` | Enable debug logging |
-| `OPENAI_API_KEY` | *required* | OpenAI API key for embeddings |
-| `PORT` | `8000` | Server port |
-
-## 🚢 Deployment on Railway
-
-### Automatic Deployment
-The project is configured for Railway deployment:
-
-```toml
-[build]
-builder = "NIXPACKS"
-buildCommand = "pip install -r requirements.txt"
-
-[deploy]
-startCommand = "python app.py"
-healthcheckPath = "/"
-healthcheckTimeout = 300
-```
-
-### Deployment Steps
-1. Connect GitHub repository to Railway
-2. Set environment variables in Railway dashboard
-3. Deploy automatically on git push
-4. Access at `https://your-app.railway.app/mcp`
-
-## 🎯 Challenges & Solutions
-
-### Challenge 1: 400 Bad Request with Agent Builders
-**Problem**: Railway deployment returned `400 Bad Request` when agent builders tried to connect.
-
-**Root Cause**: Incorrect transport configuration. The server was using `transport="streamable-http"` but agent builders expect Server-Sent Events (SSE).
-
-**Solution**:
-```python
-# Before (causing 400 errors)
-mcp.run(transport="streamable-http", ...)
-
-# After (working with agent builders)
-mcp.run(transport="sse", ...)
-```
-
-**Impact**: Agent builders can now successfully connect and use MCP tools.
-
-### Challenge 2: Index Loading Performance
-**Problem**: Large decision datasets required efficient indexing and loading.
-
-**Solution**: Implemented offline index building with numpy arrays for fast vector search and cosine similarity calculations.
-
-## 📊 Performance Characteristics
-
-- **Embedding Model**: `text-embedding-3-small` (1536 dimensions)
-- **Chunk Size**: 800 characters with 100 character overlap
-- **Search Algorithm**: Cosine similarity over normalized embeddings
-- **Index Format**: NumPy compressed arrays (`.npz`)
-
-## 🔍 Debugging
-
-Enable debug logging:
+## Build index (offline)
+Paragraph-based (preferred):
 ```bash
-export MCP_DEBUG=1
-python app.py
+OPENAI_API_KEY=sk-... ./venv/bin/python index_builder.py \
+  --input tolerated_decisions_sectioned_motives.jsonl \
+  --output decisions_index.npz \
+  --use-paragraphs \
+  --paragraphs-per-chunk 1
 ```
-
-Check server health:
+Text slicing (fallback):
 ```bash
-curl http://localhost:8000/health
-```
-
-## 📝 Development
-
-### Building Search Index
-```bash
-python index_builder.py \
+OPENAI_API_KEY=sk-... ./venv/bin/python index_builder.py \
   --input tolerated_decisions.jsonl \
   --output decisions_index.npz \
   --chunk-size 800 \
-  --chunk-overlap 100 \
+  --chunk-overlap 100
+```
+
+## Deploy (Railway/Nixpacks)
+- `railway.toml` runs `python app.py` from repo root.
+- Ensure `decisions_index.npz` is in the image or set `INDEX_PATH` accordingly.
+- Set `ENABLE_SEARCH_TOOLS=1`, `OPENAI_API_KEY`, and any optional debug/skip flags.
   --model text-embedding-3-small
 ```
 
