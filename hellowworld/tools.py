@@ -70,7 +70,7 @@ def search_decisions(query: str, top_k: int = 5, paragraph_type: Optional[str] =
 
     semantic_scores = index_loader.EMBEDDINGS @ query_vec  # cosine-ish assuming normalized vectors
 
-    # Filter by paragraph type if specified using text-based heuristics
+    # Filter by paragraph type if specified
     valid_indices = set(range(len(semantic_scores)))
     if paragraph_type:
         valid_indices = set()
@@ -78,46 +78,38 @@ def search_decisions(query: str, top_k: int = 5, paragraph_type: Optional[str] =
 
         for idx, meta in enumerate(index_loader.META):
             if isinstance(meta, dict):
-                chunk_text = meta.get("chunk", "").lower()
+                # Use the section field from metadata if available (preferred method)
+                meta_section = meta.get("section", "").lower()
 
-                # Apply paragraph type filtering based on content patterns
-                should_include = False
-
-                if paragraph_type_lower == "reasoning":
-                    # Reasoning sections typically contain motivation, consideration, analysis
-                    should_include = any(keyword in chunk_text for keyword in [
-                        "motyv", "atsižvelg", "įvertinus", "consider", "reasoning",
-                        "teismas", "konstatuoja", "nurodo"
-                    ])
-                elif paragraph_type_lower == "facts":
-                    # Facts sections contain established circumstances
-                    should_include = any(keyword in chunk_text for keyword in [
-                        "nustatė", "nustatyta", "aplinky", "faktai", "facts",
-                        "įrodyta", "patvirtinta"
-                    ])
-                elif paragraph_type_lower == "law":
-                    # Law sections reference legal codes and provisions
-                    should_include = any(keyword in chunk_text for keyword in [
-                        "numato", " BK ", " CK ", " įstatym", " nuostat",
-                        " Baudžiamojo kodekso ", " Civilinio kodekso "
-                    ])
-                elif paragraph_type_lower == "operative":
-                    # Operative sections contain decisions and orders
-                    should_include = any(keyword in chunk_text for keyword in [
-                        "nutar", "nusprendė", "pripažįsta", "panaikina",
-                        "patvirtina", "atmesti"
-                    ])
-                elif paragraph_type_lower == "header":
-                    # Header sections contain case identification
-                    should_include = any(keyword in chunk_text for keyword in [
-                        "byla", "nr.", "teismas", "šalys", "case"
-                    ])
-                else:
-                    # Unknown paragraph type - include chunk for broad search
-                    should_include = True
-
-                if should_include:
+                if meta_section == paragraph_type_lower:
                     valid_indices.add(idx)
+                else:
+                    # Fallback: Apply text-based heuristics if section field doesn't match
+                    chunk_text = meta.get("chunk", "").lower()
+                    should_include = False
+
+                    if paragraph_type_lower == "reasoning":
+                        should_include = any(keyword in chunk_text for keyword in [
+                            "motyv", "atsižvelg", "įvertinus", "teismas", "konstatuoja"
+                        ])
+                    elif paragraph_type_lower == "facts":
+                        should_include = any(keyword in chunk_text for keyword in [
+                            "nustatė", "nustatyta", "aplinky", "faktai", "įrodyta"
+                        ])
+                    elif paragraph_type_lower == "law":
+                        should_include = any(keyword in chunk_text for keyword in [
+                            "numato", " BK ", " CK ", " įstatym", " Baudžiamojo kodekso "
+                        ])
+                    elif paragraph_type_lower == "operative":
+                        should_include = any(keyword in chunk_text for keyword in [
+                            "nutar", "nusprendė", "pripažįsta", "panaikina"
+                        ])
+                    else:
+                        # Include chunk if no specific filtering applies
+                        should_include = True
+
+                    if should_include:
+                        valid_indices.add(idx)
 
     # Stage 3: Combine results with hybrid scoring
     combined_scores = {}
@@ -221,30 +213,34 @@ def get_decision_chunks(decision_id: str, query: Optional[str] = None, top_k: in
 
             # Filter by paragraph type if specified
             if paragraph_type:
-                chunk_text = chunk_data["chunk"].lower() if chunk_data["chunk"] else ""
                 paragraph_type_lower = paragraph_type.lower()
+                meta_section = meta.get("section", "").lower() if isinstance(meta, dict) else ""
 
-                should_include = False
-                if paragraph_type_lower == "reasoning":
-                    should_include = any(keyword in chunk_text for keyword in [
-                        "motyv", "atsižvelg", "įvertinus", "consider", "reasoning",
-                        "teismas", "konstatuoja", "nurodo"
-                    ])
-                elif paragraph_type_lower == "facts":
-                    should_include = any(keyword in chunk_text for keyword in [
-                        "nustatė", "nustatyta", "aplinky", "faktai", "facts",
-                        "įrodyta", "patvirtinta"
-                    ])
-                elif paragraph_type_lower == "law":
-                    should_include = any(keyword in chunk_text for keyword in [
-                        "numato", " BK ", " CK ", " įstatym", " nuostat",
-                        " Baudžiamojo kodekso ", " Civilinio kodekso "
-                    ])
+                # Use section field if available, otherwise fallback to text matching
+                if meta_section and meta_section == paragraph_type_lower:
+                    pass  # Include this chunk
                 else:
-                    should_include = True  # Include if paragraph type not recognized
+                    # Fallback text-based filtering
+                    chunk_text = chunk_data["chunk"].lower() if chunk_data["chunk"] else ""
+                    should_include = False
 
-                if not should_include:
-                    continue
+                    if paragraph_type_lower == "reasoning":
+                        should_include = any(keyword in chunk_text for keyword in [
+                            "motyv", "atsižvelg", "įvertinus", "teismas", "konstatuoja"
+                        ])
+                    elif paragraph_type_lower == "facts":
+                        should_include = any(keyword in chunk_text for keyword in [
+                            "nustatė", "nustatyta", "aplinky", "faktai", "įrodyta"
+                        ])
+                    elif paragraph_type_lower == "law":
+                        should_include = any(keyword in chunk_text for keyword in [
+                            "numato", " BK ", " CK ", " įstatym", " Baudžiamojo kodekso "
+                        ])
+                    else:
+                        should_include = True
+
+                    if not should_include:
+                        continue
 
             chunks.append(chunk_data)
 
