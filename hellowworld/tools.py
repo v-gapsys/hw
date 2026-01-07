@@ -134,24 +134,42 @@ def search_decisions(query: str, top_k: int = 5, paragraph_type: Optional[str] =
             seen_decision_ids.add(decision_id)
 
     # Add remaining high-scoring semantic results (filtered by paragraph type)
-    semantic_indices = np.argsort(semantic_scores)[::-1]  # Sort by semantic score descending
+    if paragraph_type:
+        # When filtering by paragraph type, prioritize matches within that type
+        # First, collect all valid indices sorted by semantic score
+        valid_semantic_scores = [(idx, float(semantic_scores[idx])) for idx in valid_indices]
+        valid_semantic_scores.sort(key=lambda x: x[1], reverse=True)  # Sort by semantic score descending
 
-    for idx in semantic_indices:
-        if idx not in valid_indices:
-            continue
+        for idx, score in valid_semantic_scores:
+            meta = index_loader.META[idx]
+            decision_id = meta.get("id") if isinstance(meta, dict) else getattr(meta, "id", None)
 
-        meta = index_loader.META[idx]
-        decision_id = meta.get("id") if isinstance(meta, dict) else getattr(meta, "id", None)
+            if decision_id and decision_id not in seen_decision_ids:
+                combined_scores[decision_id] = {
+                    "score": score,
+                    "semantic_score": score,
+                    "metadata_boost": 0.0,
+                    "index": idx,
+                    "meta": meta
+                }
+                seen_decision_ids.add(decision_id)
+    else:
+        # Original logic for general search (no paragraph type filtering)
+        semantic_indices = np.argsort(semantic_scores)[::-1]  # Sort by semantic score descending
 
-        if decision_id and decision_id not in seen_decision_ids:
-            combined_scores[decision_id] = {
-                "score": float(semantic_scores[idx]),
-                "semantic_score": float(semantic_scores[idx]),
-                "metadata_boost": 0.0,
-                "index": idx,
-                "meta": meta
-            }
-            seen_decision_ids.add(decision_id)
+        for idx in semantic_indices:
+            meta = index_loader.META[idx]
+            decision_id = meta.get("id") if isinstance(meta, dict) else getattr(meta, "id", None)
+
+            if decision_id and decision_id not in seen_decision_ids:
+                combined_scores[decision_id] = {
+                    "score": float(semantic_scores[idx]),
+                    "semantic_score": float(semantic_scores[idx]),
+                    "metadata_boost": 0.0,
+                    "index": idx,
+                    "meta": meta
+                }
+                seen_decision_ids.add(decision_id)
 
     # Sort by combined score and return top results
     sorted_results = sorted(combined_scores.items(), key=lambda x: x[1]["score"], reverse=True)
