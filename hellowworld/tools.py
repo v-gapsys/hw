@@ -189,10 +189,13 @@ def _perform_search(query: str, top_k: int = 5, paragraph_type: Optional[str] = 
         # Get original chunk
         chunk = meta.get("chunk") if isinstance(meta, dict) else getattr(meta, "chunk", None)
 
+        # Prepend formatted header to chunk content
+        enhanced_chunk = f"{formatted_header}: {chunk}" if chunk else formatted_header
+
         results.append({
             "id": decision_id,
             "title": meta.get("title") if isinstance(meta, dict) else getattr(meta, "title", None),
-            "chunk": chunk,
+            "chunk": enhanced_chunk,  # Now includes formatted header
             "formatted_header": formatted_header,
             "score": score_data["score"],
             "semantic_score": score_data["semantic_score"],
