@@ -171,14 +171,34 @@ def _perform_search(query: str, top_k: int = 5, paragraph_type: Optional[str] = 
     results: List[Dict[str, Any]] = []
     for decision_id, score_data in top_results:
         meta = score_data["meta"]
+
+        # Format the header with court, date, and decision info
+        court = meta.get("court", "") if isinstance(meta, dict) else ""
+        date_iso = meta.get("date_iso", "") if isinstance(meta, dict) else ""
+        decision_id_display = decision_id or ""
+
+        # Format date as YYYY-MM-DD
+        if date_iso and len(date_iso) >= 10:
+            formatted_date = date_iso[:10]  # Take YYYY-MM-DD part
+        else:
+            formatted_date = date_iso
+
+        # Create formatted header (assuming all are "nutartis" for now)
+        formatted_header = f"{court} {formatted_date} nutartis byloje Nr. {decision_id_display}"
+
+        # Get original chunk
+        chunk = meta.get("chunk") if isinstance(meta, dict) else getattr(meta, "chunk", None)
+
         results.append({
             "id": decision_id,
             "title": meta.get("title") if isinstance(meta, dict) else getattr(meta, "title", None),
-            "chunk": meta.get("chunk") if isinstance(meta, dict) else getattr(meta, "chunk", None),
+            "chunk": chunk,
+            "formatted_header": formatted_header,
             "score": score_data["score"],
             "semantic_score": score_data["semantic_score"],
             "metadata_boost": score_data["metadata_boost"],
-            "court": meta.get("court") if isinstance(meta, dict) else None,
+            "court": court,
+            "date": formatted_date,
             "judges": meta.get("judges") if isinstance(meta, dict) else None,
             "parties": meta.get("parties") if isinstance(meta, dict) else None,
         })
