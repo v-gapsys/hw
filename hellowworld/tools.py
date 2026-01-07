@@ -48,15 +48,8 @@ def _metadata_search(query: str, meta_fields: List[str]) -> List[Tuple[int, floa
     return matches
 
 
-@mcp.tool()
-def search_decisions(query: str, top_k: int = 5, paragraph_type: Optional[str] = None) -> List[Dict[str, Any]]:
-    """Hybrid search over decisions: combines metadata filtering with semantic search.
-    Optionally filter by paragraph type (e.g., 'reasoning', 'facts', 'law').
-    First searches structured metadata fields, then evaluates content semantically.
-    Requires ENABLE_SEARCH_TOOLS and a loaded index."""
-    _ensure_search_enabled()
-    index_loader.ensure_index_ready()
-
+def _perform_search(query: str, top_k: int = 5, paragraph_type: Optional[str] = None) -> List[Dict[str, Any]]:
+    """Shared search implementation used by all search tools."""
     # Stage 1: Metadata search for exact matches in structured fields
     metadata_fields = ["parties", "judges", "court", "case_type", "title", "tolerated_reason", "motive_schema"]
     metadata_matches = _metadata_search(query, metadata_fields)
@@ -194,11 +187,24 @@ def search_decisions(query: str, top_k: int = 5, paragraph_type: Optional[str] =
 
 
 @mcp.tool()
+def search_decisions(query: str, top_k: int = 5, paragraph_type: Optional[str] = None) -> List[Dict[str, Any]]:
+    """Hybrid search over decisions: combines metadata filtering with semantic search.
+    Optionally filter by paragraph type (e.g., 'reasoning', 'facts', 'law').
+    First searches structured metadata fields, then evaluates content semantically.
+    Requires ENABLE_SEARCH_TOOLS and a loaded index."""
+    _ensure_search_enabled()
+    index_loader.ensure_index_ready()
+    return _perform_search(query, top_k, paragraph_type)
+
+
+@mcp.tool()
 def search_reasoning_paragraphs(query: str, top_k: int = 5) -> List[Dict[str, Any]]:
     """Search specifically within reasoning paragraphs for legal analysis and motivation.
     Equivalent to search_decisions(query, top_k=top_k, paragraph_type='reasoning').
     Requires ENABLE_SEARCH_TOOLS and a loaded index."""
-    return search_decisions(query, top_k=top_k, paragraph_type="reasoning")
+    _ensure_search_enabled()
+    index_loader.ensure_index_ready()
+    return _perform_search(query, top_k=top_k, paragraph_type="reasoning")
 
 
 @mcp.tool()
@@ -206,7 +212,9 @@ def search_facts_paragraphs(query: str, top_k: int = 5) -> List[Dict[str, Any]]:
     """Search specifically within facts paragraphs for established circumstances.
     Equivalent to search_decisions(query, top_k=top_k, paragraph_type='facts').
     Requires ENABLE_SEARCH_TOOLS and a loaded index."""
-    return search_decisions(query, top_k=top_k, paragraph_type="facts")
+    _ensure_search_enabled()
+    index_loader.ensure_index_ready()
+    return _perform_search(query, top_k=top_k, paragraph_type="facts")
 
 
 @mcp.tool()
@@ -214,7 +222,9 @@ def search_law_paragraphs(query: str, top_k: int = 5) -> List[Dict[str, Any]]:
     """Search specifically within law paragraphs for legal references and provisions.
     Equivalent to search_decisions(query, top_k=top_k, paragraph_type='law').
     Requires ENABLE_SEARCH_TOOLS and a loaded index."""
-    return search_decisions(query, top_k=top_k, paragraph_type="law")
+    _ensure_search_enabled()
+    index_loader.ensure_index_ready()
+    return _perform_search(query, top_k=top_k, paragraph_type="law")
 
 
 @mcp.tool()
