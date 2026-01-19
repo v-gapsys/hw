@@ -1,6 +1,5 @@
 import os
 
-import uvicorn
 from starlette.applications import Starlette
 from starlette.responses import JSONResponse
 from starlette.routing import Mount, Route
@@ -15,10 +14,54 @@ async def mcp_get_probe(_: object) -> JSONResponse:
     return JSONResponse({"status": "ok", "message": "MCP endpoint probe ok", "mcp_path": MCP_PATH})
 
 
-def build_app() -> Starlette:
-    mcp_app = getattr(mcp, "app", None) or getattr(mcp, "asgi_app", None)
+def resolve_mcp_asgi_app() -> object | None:
+    candidates = [
+        "app",
+        "asgi_app",
+        "asgi",
+        "_app",
+        "_asgi_app",
+        "_asgi",
+        "application",
+    ]
+    builders = [
+        "get_app",
+        "build_app",
+        "create_app",
+        "asgi_app",
+        "app",
+        "_create_app",
+        "_build_app",
+        "_get_app",
+    ]
+
+    for obj in (mcp, getattr(mcp, "server", None), getattr(mcp, "_server", None)):
+        if obj is None:
+            continue
+        for name in candidates:
+            app = getattr(obj, name, None)
+            if app is not None:
+                return app
+        for name in builders:
+            builder = getattr(obj, name, None)
+            if callable(builder):
+                try:
+                    app = builder()
+                except TypeError:
+                    continue
+                if app is not None:
+                    return app
+
+    if callable(mcp):
+        return mcp
+
+    return None
+
+
+def build_app() -> Starlette | None:
+    mcp_app = resolve_mcp_asgi_app()
     if mcp_app is None:
-        raise RuntimeError("FastMCP ASGI app not available")
+        return None
 
     return Starlette(
         routes=[
@@ -36,4 +79,15 @@ if __name__ == "__main__":
     startup()
 
     app = build_app()
-    uvicorn.run(app, host=host, port=port)
+    if app is None:
+        # Fall back to FastMCP's runner if we cannot resolve its ASGI app.
+        mcp.run(
+            transport="streamable-http",
+            host=host,
+            port=port,
+            path=MCP_PATH,
+        )
+    else:
+        import uvicorn
+
+        uvicorn.run(app, host=host, port=port)
