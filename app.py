@@ -13,7 +13,7 @@ if __name__ == "__main__":
     startup()
 
     mcp.run(
-        transport="sse",
+        transport="streamable_http",
         host=host,
         port=port,
         path=MCP_PATH,

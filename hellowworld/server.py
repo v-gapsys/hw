@@ -12,7 +12,7 @@ async def root(_: Request) -> JSONResponse:
     return JSONResponse({"status": "ok", "message": "MCP server ready", "mcp_path": MCP_PATH})
 
 
-@mcp.custom_route("/mcp", methods=["GET"])
+@mcp.custom_route("/mcp-probe", methods=["GET"])
 async def mcp_probe(_: Request) -> JSONResponse:
     return JSONResponse({"status": "ok", "message": "MCP endpoint reachable", "mcp_path": MCP_PATH})
 
