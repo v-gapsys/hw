@@ -17,6 +17,12 @@ async def mcp_probe(_: Request) -> JSONResponse:
     return JSONResponse({"status": "ok", "message": "MCP endpoint reachable", "mcp_path": MCP_PATH})
 
 
+@mcp.custom_route(MCP_PATH, methods=["GET"])
+async def mcp_get_probe(_: Request) -> JSONResponse:
+    # OpenAI MCP clients may probe with GET before initialize; return ok for that.
+    return JSONResponse({"status": "ok", "message": "MCP endpoint probe ok", "mcp_path": MCP_PATH})
+
+
 @mcp.custom_route("/health", methods=["GET"])
 async def health(_: Request) -> JSONResponse:
     return JSONResponse(
