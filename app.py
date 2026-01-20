@@ -25,6 +25,9 @@ def resolve_mcp_asgi_app() -> object | None:
         "application",
     ]
     builders = [
+        "http_app",
+        "streamable_http_app",
+        "sse_app",
         "get_app",
         "build_app",
         "create_app",
@@ -59,7 +62,10 @@ def resolve_mcp_asgi_app() -> object | None:
 
 
 def build_app() -> Starlette | None:
-    mcp_app = resolve_mcp_asgi_app()
+    try:
+        mcp_app = mcp.http_app(path=MCP_PATH)
+    except Exception:
+        mcp_app = resolve_mcp_asgi_app()
     if mcp_app is None:
         return None
 
