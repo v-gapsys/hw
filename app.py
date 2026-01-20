@@ -72,8 +72,9 @@ def build_app() -> Starlette | None:
     return Starlette(
         routes=[
             Route(MCP_PATH, mcp_get_probe, methods=["GET"]),
-            Mount("/", app=mcp_app),
-        ]
+            Mount(MCP_PATH, app=mcp_app),
+        ],
+        lifespan=getattr(mcp_app, "lifespan", None),
     )
 
 
