@@ -20,12 +20,15 @@ class MCPProbeWrapper:
         self._mcp_app = mcp_app
 
     async def __call__(self, scope: dict, receive: object, send: object) -> None:
-        if scope.get("type") == "http" and scope.get("method") == "GET":
+        if scope.get("type") == "http":
             path = scope.get("path", "")
-            if path in ("", "/"):
+            if scope.get("method") == "GET" and path in ("", "/"):
                 response = await mcp_get_probe(Request(scope, receive))
                 await response(scope, receive, send)
                 return
+            if path == "":
+                # Normalize empty mount path to root for FastMCP routing.
+                scope = {**scope, "path": "/"}
         await self._mcp_app(scope, receive, send)
 
 
@@ -85,12 +88,14 @@ def build_app() -> Starlette | None:
     if mcp_app is None:
         return None
 
-    return Starlette(
+    app = Starlette(
         routes=[
             Mount(MCP_PATH, app=MCPProbeWrapper(mcp_app)),
         ],
         lifespan=getattr(mcp_app, "lifespan", None),
     )
+    app.router.redirect_slashes = False
+    return app
 
 
 if __name__ == "__main__":
