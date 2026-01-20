@@ -85,7 +85,7 @@ def resolve_mcp_asgi_app() -> object | None:
 
 def build_app() -> Starlette | None:
     try:
-        mcp_app = mcp.http_app(path=MCP_PATH)
+        mcp_app = mcp.http_app(path=MCP_PATH, stateless_http=True)
     except Exception:
         mcp_app = resolve_mcp_asgi_app()
     if mcp_app is None:
