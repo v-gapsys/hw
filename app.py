@@ -1,6 +1,7 @@
 import os
 
 from starlette.applications import Starlette
+from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.routing import Mount, Route
 
@@ -12,6 +13,20 @@ from hellowworld.server import startup
 async def mcp_get_probe(_: object) -> JSONResponse:
     # OpenAI MCP clients may probe with GET before initialize; return ok for that.
     return JSONResponse({"status": "ok", "message": "MCP endpoint probe ok", "mcp_path": MCP_PATH})
+
+
+class MCPProbeWrapper:
+    def __init__(self, mcp_app: object) -> None:
+        self._mcp_app = mcp_app
+
+    async def __call__(self, scope: dict, receive: object, send: object) -> None:
+        if scope.get("type") == "http" and scope.get("method") == "GET":
+            path = scope.get("path", "")
+            if path in ("", "/"):
+                response = await mcp_get_probe(Request(scope, receive))
+                await response(scope, receive, send)
+                return
+        await self._mcp_app(scope, receive, send)
 
 
 def resolve_mcp_asgi_app() -> object | None:
@@ -71,8 +86,7 @@ def build_app() -> Starlette | None:
 
     return Starlette(
         routes=[
-            Route(MCP_PATH, mcp_get_probe, methods=["GET"]),
-            Mount(MCP_PATH, app=mcp_app),
+            Mount(MCP_PATH, app=MCPProbeWrapper(mcp_app)),
         ],
         lifespan=getattr(mcp_app, "lifespan", None),
     )
