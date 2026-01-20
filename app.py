@@ -3,7 +3,7 @@ import os
 from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.responses import JSONResponse
-from starlette.routing import Mount, Route
+from starlette.routing import Mount
 
 from hellowworld.config import MCP_PATH
 from hellowworld.core import mcp
@@ -16,19 +16,23 @@ async def mcp_get_probe(_: object) -> JSONResponse:
 
 
 class MCPProbeWrapper:
-    def __init__(self, mcp_app: object) -> None:
+    def __init__(self, mcp_app: object, mcp_path: str) -> None:
         self._mcp_app = mcp_app
+        self._mcp_path = mcp_path.rstrip("/") or "/"
 
     async def __call__(self, scope: dict, receive: object, send: object) -> None:
         if scope.get("type") == "http":
             path = scope.get("path", "")
-            if scope.get("method") == "GET" and path in ("", "/"):
-                response = await mcp_get_probe(Request(scope, receive))
-                await response(scope, receive, send)
-                return
-            if path == "":
-                # Normalize empty mount path to root for FastMCP routing.
-                scope = {**scope, "path": "/"}
+            if path in (self._mcp_path, f"{self._mcp_path}/"):
+                if scope.get("method") == "GET":
+                    headers = dict(scope.get("headers") or [])
+                    accept = headers.get(b"accept", b"").decode("utf-8").lower()
+                    if "text/event-stream" not in accept:
+                        response = await mcp_get_probe(Request(scope, receive))
+                        await response(scope, receive, send)
+                        return
+                if path.endswith("/") and self._mcp_path != "/":
+                    scope = {**scope, "path": self._mcp_path}
         await self._mcp_app(scope, receive, send)
 
 
@@ -81,21 +85,16 @@ def resolve_mcp_asgi_app() -> object | None:
 
 def build_app() -> Starlette | None:
     try:
-        # Mount at MCP_PATH, so the FastMCP app should be rooted at "/".
-        mcp_app = mcp.http_app(path="/")
+        mcp_app = mcp.http_app(path=MCP_PATH)
     except Exception:
         mcp_app = resolve_mcp_asgi_app()
     if mcp_app is None:
         return None
 
-    app = Starlette(
-        routes=[
-            Mount(MCP_PATH, app=MCPProbeWrapper(mcp_app)),
-        ],
+    return Starlette(
+        routes=[Mount("/", app=MCPProbeWrapper(mcp_app, MCP_PATH))],
         lifespan=getattr(mcp_app, "lifespan", None),
     )
-    app.router.redirect_slashes = False
-    return app
 
 
 if __name__ == "__main__":

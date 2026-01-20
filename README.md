@@ -40,7 +40,7 @@ Env vars:
 - `OPENAI_API_KEY` required for search calls
 - `MCP_DEBUG=1` for debug logs
 
-Health: `/` and `/health` return status + index info.
+Health: `/mcp/health` returns status + index info (the MCP app is mounted at `MCP_PATH`).
 
 ## MCP tools
 - `search_decisions(query, top_k=5, paragraph_type=None)`: hybrid metadata + semantic search; optional paragraph filter (`reasoning`, `facts`, `law`, `operative`, `header`).
@@ -68,6 +68,8 @@ OPENAI_API_KEY=sk-... ./venv/bin/python index_builder.py \
 
 ## Deploy (Railway/Nixpacks)
 - `railway.toml` runs `python app.py` from repo root.
+- Healthcheck path should target `MCP_PATH` (default `/mcp`), e.g. `/mcp/health`.
+- MCP clients may issue a GET probe to `MCP_PATH`; this is handled and returns JSON.
 - Ensure `decisions_index.npz` is in the image or set `INDEX_PATH` accordingly.
 - Set `ENABLE_SEARCH_TOOLS=1`, `OPENAI_API_KEY`, and any optional debug/skip flags.
   --model text-embedding-3-small
